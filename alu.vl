@@ -1,0 +1,177 @@
+module halfadder(S,C,x,y);
+//S = sum
+//C = carry
+
+input x,y;
+output S,C;
+
+xor x1 (S,x,y);
+and a1 (C,x,y);
+
+endmodule
+
+module fulladder (S,C,x,y,z);
+input x,y,z;
+output S,C;
+wire S1,C1,C2;
+
+halfadder HA1 (S1,C1,x,y),
+          HA2 (S,C2,S1,z);
+    or C3(C,C2,C1);    
+endmodule 
+
+module mux4x1(i0,i1,i2,i3,select,y); 
+  input i0,i1,i2,i3; 
+  input [1:0] select; 
+  output y;
+  
+  mux2x1 mux1(i0, i1, select[0], m1);
+  mux2x1 mux2(i2, i3, select[0], m2);
+  mux2x1 mux3(m1, m2, select[1], y);
+endmodule
+
+
+
+
+//increase to 32 bits
+module ALU (op,a,b,result,zero);
+   input [31:0] a;
+   input [31:0] b;
+   input [3:0] op;
+   output [31:0] result;
+   output zero;
+   //              a,   b,Ainvert,binvert,op,less,carryin,       carryout,     result
+   ALU1   alu0 (a[0],b[0],op[3],op[2],op[1:0],set, op[2],c1,result[0]);
+   ALU1   alu1 (a[1],b[1],op[3],op[2],op[1:0],1'b0,c1,   c2,result[1]);
+   ALU1   alu2 (a[2],b[2],op[3],op[2],op[1:0],1'b0,c2,   c3,result[2]);
+   ALU1   alu3 (a[3],b[3],op[3],op[2],op[1:0],1'b0,c3,   c4,result[3]);
+   ALU1   alu4 (a[4],b[4],op[3],op[2],op[1:0],1'b0,c4,   c5,result[4]);
+   ALU1   alu5 (a[5],b[5],op[3],op[2],op[1:0],1'b0,c5,   c6,result[5]);
+   ALU1   alu6 (a[6],b[6],op[3],op[2],op[1:0],1'b0,c6,   c7,result[6]);
+   ALU1   alu7 (a[7],b[7],op[3],op[2],op[1:0],1'b0,c7,   c8,result[7]);
+   ALU1   alu8 (a[8],b[8],op[3],op[2],op[1:0],1'b0,c8,   c9,result[8]);
+   ALU1   alu9 (a[9],b[9],op[3],op[2],op[1:0],1'b0,c9,   c10,result[9]);
+   ALU1   alu10 (a[10],b[10],op[3],op[2],op[1:0],1'b0,c10,   c11,result[10]);
+   ALU1   alu11 (a[11],b[11],op[3],op[2],op[1:0],1'b0,c11,   c12,result[11]);
+   ALU1   alu12 (a[12],b[12],op[3],op[2],op[1:0],1'b0,c12,   c13,result[12]);
+   ALU1   alu13 (a[13],b[13],op[3],op[2],op[1:0],1'b0,c13,   c14,result[13]);
+   ALU1   alu14 (a[14],b[14],op[3],op[2],op[1:0],1'b0,c14,   c15,result[14]);
+   ALU1   alu15 (a[15],b[15],op[3],op[2],op[1:0],1'b0,c15,   c16,result[15]);
+    ALU1   alu16 (a[16],b[16],op[3],op[2],op[1:0],1'b0,c16,   c17,result[16]);
+    ALU1   alu17 (a[17],b[17],op[3],op[2],op[1:0],1'b0,c17,   c18,result[17]);
+    ALU1   alu18 (a[18],b[18],op[3],op[2],op[1:0],1'b0,c18,   c19,result[18]);
+    ALU1   alu19 (a[19],b[19],op[3],op[2],op[1:0],1'b0,c19,   c20,result[19]);
+    ALU1   alu20 (a[20],b[20],op[3],op[2],op[1:0],1'b0,c20,   c21,result[20]);
+    ALU1   alu21 (a[21],b[21],op[3],op[2],op[1:0],1'b0,c21,   c22,result[21]);
+    ALU1   alu22 (a[22],b[22],op[3],op[2],op[1:0],1'b0,c22,   c23,result[22]);
+    ALU1   alu23 (a[23],b[23],op[3],op[2],op[1:0],1'b0,c23,   c24,result[23]);
+    ALU1   alu24 (a[24],b[24],op[3],op[2],op[1:0],1'b0,c24,   c25,result[24]);
+    ALU1   alu25 (a[25],b[25],op[3],op[2],op[1:0],1'b0,c25,   c26,result[25]);
+    ALU1   alu26 (a[26],b[26],op[3],op[2],op[1:0],1'b0,c26,   c27,result[26]);
+    ALU1   alu27 (a[27],b[27],op[3],op[2],op[1:0],1'b0,c27,   c28,result[27]);
+    ALU1   alu28 (a[28],b[28],op[3],op[2],op[1:0],1'b0,c28,   c29,result[28]);
+    ALU1   alu29 (a[29],b[29],op[3],op[2],op[1:0],1'b0,c29,   c30,result[29]);
+    ALU1   alu30 (a[30],b[30],op[3],op[2],op[1:0],1'b0,c30,   c31,result[30]);
+    ALUmsb alu31 (a[31],b[31],op[3],op[2],op[1:0],1'b0,c31,   c32,result[31],set);
+   nor nor1(zero,result[0],result[1],result[2],result[3],result[4],result[5],result[6],result[7],result[8],result[9],result[10],result[11],result[12],result[13],result[14],result[15],result[16],result[17],result[18],result[19],result[20],result[21],result[22],result[23],result[24],result[25],result[26],result[27],result[28],result[29],result[30],result[31]);
+
+endmodule
+
+module ALU1(a,b,Ainvert,Binvert,op,less,Cin,Cout,Result);
+input a,b,Binvert,less,Ainvert;
+input [1:0] op;
+input Cin;
+output Cout,Result,Sum;
+wire b1,andout,orout,a1;
+
+not not1(a_inv, a);
+not not2(b_inv, b);
+
+
+xor(a1,a,Ainvert);
+// or
+
+xor(b1,b,Binvert);
+
+
+or(orout,a1,b1);
+and(andout,a1,b1 );
+
+
+fulladder fa(Sum,Cout,a1,b1,Cin);
+mux4x1 mux2(andout,orout,Sum,less,op[1:0],Result);
+
+endmodule
+
+module ALUmsb(a,b,Ainvert,Binvert,op,less,Cin,Cout,Result,Sum);
+input a,b,Binvert,less,Ainvert,Cin;
+input [1:0] op;
+output Sum,Result,Cout;
+wire b1,andout,s1,notb,nota,a1,t1;
+
+not not1(a_inv, a);
+not not2(b_inv, b);
+
+//mux2x1 mx1(a,a_inv,ainvert,a1),
+//        mx2(b,b_inv,binvert,b1);
+xor(a1,a,Ainvert);
+
+xor(b1,b,Binvert);
+
+or(orout,a1,b1);
+and(andout,a1,b1 );
+
+
+fulladder fa(Sum,Cout,a1,b1,Cin);
+mux4x1 mux2(andout,orout,Sum,less,op[1:0],Result);
+
+
+endmodule
+
+module mux2x1(A,B,select,OUT); 
+  input A,B,select; 
+  output OUT;
+
+  not not1(i0, select);
+  and and1(i1, A, i0);
+  and and2(i2, B, select);
+  or or1(OUT, i1, i2);
+endmodule
+
+//testAlu
+module test();
+reg [31:0] a,b;
+reg [3:0] op;
+wire [31:0] result;
+wire zero;
+reg clock;
+reg reset;
+
+
+ALU alu (op,a,b,result,zero);
+   initial begin
+   // $display("op   a                        b                         result                  zero");
+    $monitor ("op = %b a = %b %d b = %b %d | result = %b %d zero = %b",op,a,a,b,b,result,result,zero);
+     op = 3'b000; a = 4'b0111; b = 4'b0001;  // AND
+	#10 op = 3'b001; a = 4'b0101; b = 4'b0010;  // OR
+	#10 op = 3'b010; a = 4'b0101; b = 4'b0001;  // ADD
+	#10 op = 3'b010; a = 4'b0111; b = 4'b0001;  // ADD
+	#10 op = 3'b110; a = 4'b0101; b = 4'b0001;  // SUB
+	#10 op = 3'b110; a = 4'b1111; b = 4'b0001;  // SUB
+	#10 op = 3'b111; a = 4'b0101; b = 4'b0001;  // SLT
+	#10 op = 3'b111; a = 4'b1110; b = 4'b1111;  // SLT
+   end
+
+endmodule
+
+
+/* Output
+op = 0000 a = 00000000000000000000000000000111          7 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000000001          1 zero = 0
+op = 0001 a = 00000000000000000000000000000101          5 b = 00000000000000000000000000000010          2 | result = 00000000000000000000000000000111          7 zero = 0
+op = 0010 a = 00000000000000000000000000000101          5 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000000110          6 zero = 0
+op = 0010 a = 00000000000000000000000000000111          7 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000001000          8 zero = 0
+op = 0110 a = 00000000000000000000000000000101          5 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000000100          4 zero = 0
+op = 0110 a = 00000000000000000000000000001111         15 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000001110         14 zero = 0
+op = 0111 a = 00000000000000000000000000000101          5 b = 00000000000000000000000000000001          1 | result = 00000000000000000000000000000000          0 zero = 1
+op = 0111 a = 00000000000000000000000000001110         14 b = 00000000000000000000000000001111         15 | result = 00000000000000000000000000000001          1 zero = 0
+*/
