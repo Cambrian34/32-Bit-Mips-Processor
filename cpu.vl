@@ -355,6 +355,19 @@ endmodule
 //control unit
 
 
+module MainControl (Op,Control); 
+  input [5:0] Op;
+  output reg [7:0] Control;
+// IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_Branch,IDEX_ALUOp
+  always @(Op) case (Op)
+    6'b000000: Control <= 8'b10010010; // Rtype
+    6'b100011: Control <= 8'b01110000; // LW    
+    6'b101011: Control <= 8'b01001000; // SW    
+    6'b000100: Control <= 8'b00000101; // BEQ   
+    6'b001000: Control <= 8'b01010100; // ADDI
+  endcase
+endmodule
+
 module ALUControl (ALUOp,FuncCode,ALUCtl); 
   input [1:0] ALUOp;
   input [5:0] FuncCode;
@@ -372,6 +385,7 @@ module ALUControl (ALUOp,FuncCode,ALUCtl);
     endcase
   endcase
 endmodule
+
 
 module mux2bit2x1(A,B,select,OUT);
 	input [1:0] A,B;
@@ -405,27 +419,14 @@ module mux16bit2x1(A, B, select, OUT);
            mux16(A[15], B[15], select, OUT[15]);
 endmodule
 
-module MainControl (Op,Control); 
-  input [5:0] Op;
-  output reg [4:0] Control;
-// Control bits: RegDst,ALUSrc,RegWrite,ALUOp
-  always @(Op) case (Op)
-    6'b000000: Control <= 5'b10110; // Rtype
-    6'b001000: Control <= 5'b01100; // ADDI
-  endcase
-endmodule
+
 
 
 //5 stage pipeline
-module CPU (clock,PC,ALUOut,IR);
+module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
   input clock;
-  output [31:0] ALUOut,IR,PC;
-  reg[31:0] PC;
-  reg[31:0] IMemory[0:1023];
-  wire [31:0] IR,NextPC,A,B,ALUOut,RD2,SignExtend;
-  wire [3:0] ALUctl;
-  wire [1:0] ALUOp;
-  wire [4:0] WR; 
+  output [31:0] PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD;
+
 // Test Program
   initial begin 
     IMemory[0] = 32'h2009000f;  // addi $t1, $0,  15   ($t1=15)
@@ -437,35 +438,121 @@ module CPU (clock,PC,ALUOut,IR);
     IMemory[6] = 32'h014b4827;  // nor  $t1, $t2, $t3  ($t1=-32)
     IMemory[7] = 32'h016a482a;  // slt  $t1, $t3, $t2  ($t1=0)
     IMemory[8] = 32'h014b482a;  // slt  $t1, $t2, $t3  ($t1=1)
+
+    // Data
+    DMemory[0] = 5; // switch the cells and see how the simulation output changes
+    DMemory[1] = 5; // (beq is taken if DMemory[0]=7; DMemory[1]=5, not taken otherwise)
+    DMemory[2] = 5;
+    DMemory[3] = 5;
   end
 
-  initial PC = 0;
-  assign IR = IMemory[PC>>2];
-  assign WR = (RegDst) ? IR[15:11]: IR[20:16]; // RegDst Mux
-  assign B  = (ALUSrc) ? SignExtend: RD2; // ALUSrc Mux 
-  assign SignExtend = {{16{IR[15]}},IR[15:0]}; // sign extension unit
-  reg_file rf (IR[25:21],IR[20:16],WR,ALUOut,RegWrite,A,RD2,clock);
-  ALU fetch (4'b0010,PC,4,NextPC,Unused);
-  ALU ex (ALUctl, A, B, ALUOut, Zero);
-  MainControl MainCtr (IR[31:26],{RegDst,ALUSrc,RegWrite,ALUOp}); 
-  ALUControl ALUCtrl(ALUOp, IR[5:0], ALUctl); // ALU control unit
-  always @(negedge clock) begin 
+ // Pipeline 
+// IF 
+   wire [31:0] PCplus4, NextPC;
+   reg[31:0] PC, IMemory[0:1023], IFID_IR, IFID_PCplus4;
+   ALU fetch (4'b0010,PC,4,PCplus4,Unused1);
+   assign NextPC = (EXMEM_Branch && EXMEM_Zero) ? EXMEM_Target: PCplus4;
+// ID
+   wire [7:0] Control;
+   reg IDEX_RegWrite,IDEX_MemtoReg,
+       IDEX_Branch,  IDEX_MemWrite,
+       IDEX_ALUSrc,  IDEX_RegDst;
+   reg [1:0]  IDEX_ALUOp;
+   wire [31:0] RD1,RD2,SignExtend, WD;
+   reg [31:0] IDEX_PCplus4,IDEX_RD1,IDEX_RD2,IDEX_SignExt,IDEXE_IR;
+   reg [31:0] IDEX_IR; // For monitoring the pipeline
+   reg [4:0]  IDEX_rt,IDEX_rd;
+   reg MEMWB_RegWrite; // part of MEM stage, but declared here before use (to avoid error)
+   reg [4:0] MEMWB_rd; // part of MEM stage, but declared here before use (to avoid error)
+   reg_file rf (IFID_IR[25:21],IFID_IR[20:16],MEMWB_rd,WD,MEMWB_RegWrite,RD1,RD2,clock);
+   MainControl MainCtr (IFID_IR[31:26],Control); 
+   assign SignExtend = {{16{IFID_IR[15]}},IFID_IR[15:0]}; 
+// EXE
+   reg EXMEM_RegWrite,EXMEM_MemtoReg,
+       EXMEM_Branch,  EXMEM_MemWrite;
+   wire [31:0] Target;
+   reg EXMEM_Zero;
+   reg [31:0] EXMEM_Target,EXMEM_ALUOut,EXMEM_RD2;
+   reg [31:0] EXMEM_IR; // For monitoring the pipeline
+   reg [4:0] EXMEM_rd;
+   wire [31:0] B,ALUOut;
+   wire [3:0] ALUctl;
+   wire [4:0] WR;
+   ALU branch (4'b0010,IDEX_SignExt<<2,IDEX_PCplus4,Target,Unused2);
+   ALU ex (ALUctl, IDEX_RD1, B, ALUOut, Zero);
+   ALUControl ALUCtrl(IDEX_ALUOp, IDEX_SignExt[5:0], ALUctl); // ALU control unit
+   assign B  = (IDEX_ALUSrc) ? IDEX_SignExt: IDEX_RD2;        // ALUSrc Mux 
+   assign WR = (IDEX_RegDst) ? IDEX_rd: IDEX_rt;              // RegDst Mux
+// MEM
+   reg MEMWB_MemtoReg;
+   reg [31:0] DMemory[0:1023],MEMWB_MemOut,MEMWB_ALUOut;
+   reg [31:0] MEMWB_IR; // For monitoring the pipeline
+   wire [31:0] MemOut;
+   assign MemOut = DMemory[EXMEM_ALUOut>>2];
+   always @(negedge clock) if (EXMEM_MemWrite) DMemory[EXMEM_ALUOut>>2] <= EXMEM_RD2;
+// WB
+   assign WD = (MEMWB_MemtoReg) ? MEMWB_MemOut: MEMWB_ALUOut; // MemtoReg Mux
+
+   initial begin
+    PC = 0;
+// Initialize pipeline registers
+    IDEX_RegWrite=0;IDEX_MemtoReg=0;IDEX_Branch=0;IDEX_MemWrite=0;IDEX_ALUSrc=0;IDEX_RegDst=0;IDEX_ALUOp=0;
+    IFID_IR=0;
+    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_Branch=0;EXMEM_MemWrite=0;
+    EXMEM_Target=0;
+    MEMWB_RegWrite=0;MEMWB_MemtoReg=0;
+   end
+
+// Running the pipeline
+   always @(negedge clock) begin 
+// IF
     PC <= NextPC;
+    IFID_PCplus4 <= PCplus4;
+    IFID_IR <= IMemory[PC>>2];
+// ID
+    IDEX_IR <= IFID_IR; // For monitoring the pipeline
+    {IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_Branch,IDEX_ALUOp} <= Control;   
+    IDEX_PCplus4 <= IFID_PCplus4;
+    IDEX_RD1 <= RD1; 
+    IDEX_RD2 <= RD2;
+    IDEX_SignExt <= SignExtend;
+    IDEX_rt <= IFID_IR[20:16];
+    IDEX_rd <= IFID_IR[15:11];
+// EXE
+    EXMEM_IR <= IDEX_IR; // For monitoring the pipeline
+    EXMEM_RegWrite <= IDEX_RegWrite;
+    EXMEM_MemtoReg <= IDEX_MemtoReg;
+    EXMEM_Branch   <= IDEX_Branch;
+    EXMEM_MemWrite <= IDEX_MemWrite;
+    EXMEM_Target <= Target;
+    EXMEM_Zero <= Zero;
+    EXMEM_ALUOut <= ALUOut;
+    EXMEM_RD2 <= IDEX_RD2;
+    EXMEM_rd <= WR;
+// MEM
+    MEMWB_IR <= EXMEM_IR; // For monitoring the pipeline
+    MEMWB_RegWrite <= EXMEM_RegWrite;
+    MEMWB_MemtoReg <= EXMEM_MemtoReg;
+    MEMWB_MemOut <= MemOut;
+    MEMWB_ALUOut <= EXMEM_ALUOut;
+    MEMWB_rd <= EXMEM_rd;
+// WB
+// Register write happens on neg edge of the clock (if MEMWB_RegWrite is asserted)
   end
-
 endmodule
 
 
 
 module test ();
   reg clock;
-  wire signed [31:0] WD,IR,PC;
-  CPU test_cpu(clock,PC,WD,IR);
+  wire signed [31:0] PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD;
+  CPU test_cpu(clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
   always #1 clock = ~clock;
   initial begin
-    $display ("Clock PC   IR                                 WD");
-    $monitor ("%b     %2d   %b  %3d (%b)",clock,PC,IR,WD,WD);
+    $display ("PC   IFID_IR  IDEX_IR  EXMEM_IR MEMWB_IR  WD");
+    $monitor ("%3d  %h %h %h %h %2d",PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     clock = 1;
-    #17 $finish;
+    #18 $finish;
+  
   end
 endmodule
